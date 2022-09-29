@@ -1,0 +1,329 @@
+---
+title: "Weighted Polynomial Regression"
+output: 
+  html_document: 
+    theme: cerulean
+    toc: true
+    smooth_scroll: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Import and plot the data
+
+```{r data}
+rm(list = ls())
+c <- "FD"
+e <- 1 # hightest exponent value (parameter order -1)
+dat <- read.delim(paste0("chain_ages/", c, "_age_dist_copy_final_50km.txt"), header = FALSE)
+```
+
+```{r}
+x <- dat[,1]
+y <- dat[,2]
+err <- dat[,3]
+
+plot(x, y, ylim=range(c(y-err, y+err)),
+     pch=20, cex = 0.5, xlab="Distance (km)", ylab="Age (Myr)",
+     main="Age vs Distance"
+     )
+arrows(x,y-err,x,y+err, length=0.05,angle=90,code=3)
+grid(lty = "solid", lwd = 0.5)
+
+# line data
+A <- read.delim(paste0("line_and_width_tables/weighted_median_line_and_width_", c, ".txt"), header = FALSE)
+```
+
+# Perform weighted regression
+```{r regression}
+#create weights
+w <- 1/err^2
+w <- w/sum(w)
+
+#weighted regression model
+model <- lm(y ~ poly(x, e, raw = TRUE), weights = w)#specify x^n values to take polynomial 
+
+#x values to predict y at
+new <- data.frame(x = seq(0, max(A[,3])+1, 1))
+
+#confidence interval
+con_int <- predict(model, new, interval = "confidence", level = 0.95, weights = w)
+
+con_int_99 <- predict(model, new, interval = "confidence", level = 0.99, weights = w)
+
+#plot results
+#png(file = "Meetings/LV_age_progression.png", width = 1000, height = 600)
+plot(x, y, xlim = range(c(new)), ylim=range(c(y-err-1, max(con_int[,1]))),
+     pch=20, cex = 0.5, xlab="Distance (km)", ylab="Age (Myr)",
+     main=paste(c, "Age Curve")
+     )
+grid(lty = "solid", lwd = 0.5)
+polygon(c(new[,1],rev(new[,1])), c(con_int[,3],rev(con_int[,1])), col = "grey", border = NA)
+polygon(c(new[,1],rev(new[,1])), c(con_int[,2],rev(con_int[,1])), col = "grey", border = NA)
+points(x,y, pch=20, cex = 0.5)
+arrows(x,y-err,x,y+err, length=0.02,angle=90,code=3)
+lines(new[,1], con_int[,1], col = "blue")
+# for LV or RU
+#lines(new[1:930,1], con_int[1:930,1], col = "blue", lty = 2)#Louisville
+#lines(new[930:1260,1], con_int[930:1260,1], col = "blue")
+#lines(new[1261:3345,1], con_int[1261:3345,1], col = "blue")#Rurutu
+#lines(new[3345:4493,1], con_int[3345:4493,1], col = "blue")
+#lines(new[4493:5881,1], con_int[4493:5881,1], col = "blue")
+lines(new[,1], con_int[,2], lty = 2, col = "red")
+lines(new[,1], con_int[,3], lty = 2, col = "red")
+legend("topleft", legend = c("Age-progression model", "95% confidence"),
+       col = c("blue", "red"), lty = c(1, 2), bg = "white")
+#dev.off
+```
+# Export pdf Plot
+```{r export, include = FALSE}
+png(file = "new_regression_figs/con_int/HI_3_con_int2.png", 
+    width = 1000, height = 600)
+plot(x, y, xlim = range(c(new)), ylim=range(c(y-err-1, max(con_int[,1]))),
+     pch=20, cex = 0.3, xlab="Distance (km)", ylab="Age (Myr)",
+     main="Hawaiian-Emperor Age Curve" #change chain name for plot title
+     )
+grid(lty = "solid", lwd = 0.5)
+polygon(c(new[,1],rev(new[,1])), c(con_int[,3],rev(con_int[,1])), col = "grey", border = NA)
+polygon(c(new[,1],rev(new[,1])), c(con_int[,2],rev(con_int[,1])), col = "grey", border = NA)
+lines(new[,1], con_int[,1], col = "blue")
+lines(new[,1], con_int[,2], lty = 2, col = "red")
+lines(new[,1], con_int[,3], lty = 2, col = "red")
+points(x,y, pch=20, cex=0.3)
+arrows(x,y-err,x,y+err, length=0.02,angle=90,code=3, lwd = 0.3)
+points(4600, 60, pch=1, cex=27)
+grid(lty = "solid", lwd = 0.1)
+legend("topleft", legend = c("Age data", "Age-progression model", "95% confidence"), #change parameter value for legend output
+       col = c("black", "blue", "red"), lty = c(NA, 1, 2), pch = c(20, NA, NA), bg = "white")
+dev.off
+```
+
+# finding slopes and hotspot path uncertainties for 2 parameter model
+```{r}
+# models from improved trail path
+#slope <- rep(0.008914, length(new[,1])) #CR2
+#slope <- rep(0.0107501, length(new[,1])) #FD2
+#slope <- rep(0.024356, length(new[,1])) #KO2
+#slope <- rep(0.0117444, length(new[,1])) #MQ2
+#slope <- rep(0.0103169, length(new[,1])) #PC2
+#slope <- rep(0.0144939, length(new[,1])) #RU2
+#slope <- rep(0.0125302, length(new[,1])) #SA2
+#slope <- rep(0.0082712, length(new[,1])) #SO2
+
+#most updated models
+#slope <- rep(0.009178, length(new[,1])) #CR
+slope <- rep(0.01075, length(new[,1])) #FD
+#slope <- rep(0.02515, length(new[,1])) #KO
+#slope <- rep(0.01202, length(new[,1])) #MQ
+#slope <- rep(0.01448, length(new[,1])) #RU
+#slope <- rep(0.01028, length(new[,1])) #PC
+#slope <- rep(0.01799, length(new[,1])) #LV
+#slope <- rep(0.0125, length(new[,1])) #SA
+#slope <- rep(0.008708, length(new[,1])) #SO
+
+speed <- 1/slope
+
+plot(new[,1], speed, pch=20, cex = 0.3, xlab="Distance (km)", ylab="Speed (Km/Myr)",
+     main=paste(c, "Plate Speed Curve"))
+
+sig <- (con_int[,3] - con_int[,1])/1.96
+dist <- sig*speed
+
+plot(new[,1], dist, pch=20, cex = 0.3, xlab="Distance (km)", ylab="Uncertainty (Km)",
+     main="Distance Uncertainty Curve")
+summary(dist)
+```
+
+# finding slopes and hotspot path uncertainties for 3 parameter model
+```{r}
+# 3 p chains
+
+#f <- expression(6.482e-07*new^2+1.031e-02*new-1.059) #HI with most recent age updates as of 2/22/2022
+#f <- expression(-5.403e-06*new^2+2.624e-02*new-1.141) #CB with most recent age updates as of 2/23/2022
+f <- expression(6.079e-07*new^2+1.505e-02*new-3.583) #LV with most recent age updates as of 2/23/2022
+
+df <- D(f,'new')
+slope <- eval(df)
+speed <- 1/slope[,1]
+
+plot(new[,1], speed, pch=20, cex = 0.3, xlab="Distance (km)", ylab="Speed (Km/Myr)",
+     main=paste(c, "Plate Speed Curve"))
+
+sig <- (con_int[,3] - con_int[,1])/1.96
+dist <- sig*speed
+
+plot(new[,1], dist, pch=20, cex = 0.3, xlab="Distance (km)", ylab="Uncertainty (Km)",
+     main=paste(c, "Distance Uncertainty Curve"))
+summary(dist)
+```
+
+# create data table
+```{r table, include=FALSE}
+down <- con_int[,1] - con_int[,2]
+
+B <- cbind(A, con_int, dist)
+
+write.table(B, paste0("final_line_width_age_tables/", c, "_line_width_age.txt"), quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+
+write.table(B, paste0("final_line_width_age_tables/", c, "_line_width_age_col_names.txt"), quote = FALSE, sep = "\t", row.names = FALSE, col.names = c("Lon", "Lat", "Distance(km)", "Azimuth", "Smooth_Z(m)", "Raw_Z(m)", "1_sigma_width(km)", "lon_R", "lat_R", "lon_L", "lat_L", "Age(Myr)", "Lower_bound_95(Myr)", "Upper_bound_95(Myr)", "1_sigma_along(km)"))
+```
+
+# Special Case for Caroline (used for table)
+```{r CR}
+dat <- read.delim("chain_ages/CR_age_dist_copy_final_50km.txt", header = FALSE)
+
+#orginal data
+xo <- dat[,1]
+yo <- dat[,2]
+erro <- dat[,3]
+
+#fake data
+x_CR <- c(844, 844)
+y_CR <- c(7.026830+0.661, 7.026830-0.661)
+err_CR <- c(1.066743, 1.066743)
+
+#combined data
+x <- c(xo, x_CR)
+y <- c(yo, y_CR)
+err <- c(erro, err_CR)
+
+#create weights
+w <- 1/err^2
+w <- w/sum(w)
+
+#weighted regression model
+model <- lm(y ~ poly(x, 1, raw = TRUE), weights = w)#specify x^n values to take polynomial 
+
+#x values to predict y at
+new <- data.frame(x = seq(0, max(A[,3])+1, 1))
+
+#confidence interval
+con_int <- predict(model, new, interval = "confidence", level = 0.95, weights = w)
+
+con_int_99 <- predict(model, new, interval = "confidence", level = 0.99, weights = w)
+
+# plotting
+plot(xo, yo, ylim=range(c(yo-erro, yo+erro)),
+     pch=20, cex = 0.5, xlab="Distance (km)", ylab="Age (Myr)",
+     main="Age vs Distance"
+     )
+points(x_CR, y_CR, ylim = range(c(y_CR-err_CR, y_CR+err_CR)),
+     pch=20, cex = 0.5, col="red",
+     )
+arrows(xo,yo-erro,xo,yo+erro, length=0.05,angle=90,code=3)
+arrows(x_CR,y_CR-err_CR,x_CR,y_CR+err_CR, length=0.05,angle=90,code=3, col = "red")
+lines(new[,1], con_int[,1], col = "blue")
+lines(new[,1], con_int[,2], lty = 2, col = "red")
+lines(new[,1], con_int[,3], lty = 2, col = "red")
+lines(new[,1], con_int_99[,2], lty = 2, col = "dark grey")
+lines(new[,1], con_int_99[,3], lty = 2, col = "dark grey")
+grid(lty = "solid", lwd = 0.5)
+legend("topleft", legend = c("Regression model", "95% confidence", "99% confidence"),
+       col = c("blue", "red", "dark grey"), lty = c(1, 2, 2), bg = "white")
+```
+
+# Export pdf plot of CR 
+```{r export, include = FALSE}
+pdf(file = "chain_ages/sig_curves/CR_R_2.pdf", width = 10, height = 6)#change chain tag for output file
+plot(xo, yo, ylim=range(c(yo-erro, yo+erro)),
+     pch=20, cex = 0.5, xlab="Distance (km)", ylab="Age (Myr)",
+     main="Age vs Distance"
+     )
+points(x_CR, y_CR, ylim = range(c(y_CR-err_CR, y_CR+err_CR)),
+     pch=20, cex = 0.5, col="red",
+     )
+arrows(xo,yo-erro,xo,yo+erro, length=0.05,angle=90,code=3)
+arrows(x_CR,y_CR-err_CR,x_CR,y_CR+err_CR, length=0.05,angle=90,code=3, col = "red")
+lines(new[,1], con_int[,1], col = "blue")
+lines(new[,1], con_int[,2], lty = 2, col = "red")
+lines(new[,1], con_int[,3], lty = 2, col = "red")
+lines(new[,1], con_int_99[,2], lty = 2, col = "dark grey")
+lines(new[,1], con_int_99[,3], lty = 2, col = "dark grey")
+grid(lty = "solid", lwd = 0.5)
+legend("topleft", legend = c("Regression model", "95% confidence", "99% confidence"),
+       col = c("blue", "red", "dark grey"), lty = c(1, 2, 2), bg = "white")
+dev.off
+```
+
+# Special Case for Caroline 2 (did not use for table)
+```{r CR}
+dat <- read.delim("chain_ages/CR_age_dist_copy_final_50km.txt", header = FALSE)
+
+#orginal data
+xo <- dat[,1]
+yo <- dat[,2]
+erro <- dat[,3]
+
+#fake data
+x_CR <- c(512, 1153)
+y_CR <- c(3.472211, 9.220684)
+err_CR <- c(1.066743, 1.066743)
+
+#combined data
+x <- c(xo, x_CR)
+y <- c(yo, y_CR)
+err <- c(erro, err_CR)
+
+#create weights
+w <- 1/err^2
+w <- w/sum(w)
+
+#weighted regression model
+model <- lm(y ~ poly(x, 1, raw = TRUE), weights = w)#specify x^n values to take polynomial 
+
+#x values to predict y at
+new <- data.frame(x = seq(0, max(A[,3])+1, 1))
+
+#confidence interval
+con_int <- predict(model, new, interval = "confidence", level = 0.95, weights = w)
+
+con_int_99 <- predict(model, new, interval = "confidence", level = 0.99, weights = w)
+
+# plotting
+plot(xo, yo, ylim=range(c(yo-erro, yo+erro)),
+     pch=20, cex = 0.5, xlab="Distance (km)", ylab="Age (Myr)",
+     main="Age vs Distance"
+     )
+points(x_CR, y_CR, ylim = range(c(y_CR-err_CR, y_CR+err_CR)),
+     pch=20, cex = 0.5, col="red",
+     )
+arrows(xo,yo-erro,xo,yo+erro, length=0.05,angle=90,code=3)
+arrows(x_CR,y_CR-err_CR,x_CR,y_CR+err_CR, length=0.05,angle=90,code=3, col = "red")
+lines(new[,1], con_int[,1], col = "blue")
+lines(new[,1], con_int[,2], lty = 2, col = "red")
+lines(new[,1], con_int[,3], lty = 2, col = "red")
+lines(new[,1], con_int_99[,2], lty = 2, col = "dark grey")
+lines(new[,1], con_int_99[,3], lty = 2, col = "dark grey")
+grid(lty = "solid", lwd = 0.5)
+legend("topleft", legend = c("Regression model", "95% confidence", "99% confidence"),
+       col = c("blue", "red", "dark grey"), lty = c(1, 2, 2), bg = "white")
+```
+
+# Export pdf plot of CR
+```{r export, include = FALSE}
+pdf(file = "chain_ages/sig_curves/CR_R_3.pdf", width = 10, height = 6)#change chain tag for output file
+plot(xo, yo, ylim=range(c(yo-erro, yo+erro)),
+     pch=20, cex = 0.5, xlab="Distance (km)", ylab="Age (Myr)",
+     main="Age vs Distance"
+     )
+points(x_CR, y_CR, ylim = range(c(y_CR-err_CR, y_CR+err_CR)),
+     pch=20, cex = 0.5, col="red",
+     )
+arrows(xo,yo-erro,xo,yo+erro, length=0.05,angle=90,code=3)
+arrows(x_CR,y_CR-err_CR,x_CR,y_CR+err_CR, length=0.05,angle=90,code=3, col = "red")
+lines(new[,1], con_int[,1], col = "blue")
+lines(new[,1], con_int[,2], lty = 2, col = "red")
+lines(new[,1], con_int[,3], lty = 2, col = "red")
+lines(new[,1], con_int_99[,2], lty = 2, col = "dark grey")
+lines(new[,1], con_int_99[,3], lty = 2, col = "dark grey")
+grid(lty = "solid", lwd = 0.5)
+legend("topleft", legend = c("Regression model", "95% confidence", "99% confidence"),
+       col = c("blue", "red", "dark grey"), lty = c(1, 2, 2), bg = "white")
+dev.off
+```

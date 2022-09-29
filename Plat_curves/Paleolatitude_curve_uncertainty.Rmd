@@ -1,0 +1,268 @@
+---
+title: "Paleolatitude Curve Fittng"
+author: "Andrew Chase"
+date: "10/6/2020"
+output: 
+  html_document: 
+    theme: cerulean
+    toc: true
+    smooth_scroll: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Import and plot the data
+
+```{r data}
+c <-"FD"
+#exponent <- 3 #HI,LV,RU
+exponent <- 1 #others
+RU <- 1
+LV <- 1
+
+dat <- read.delim(paste0("P_lat/", c, "_age_paleolat_err.txt"), header = FALSE)
+
+x <- dat[,1]
+y <- dat[,2]
+err <- dat[,3]
+
+plot(x, y, ylim=range(c(y-err, y+err)),
+     pch=20, cex = 0.5, xlab="Age (Myr)", ylab="Latitude (degrees)",
+     main="Paleolatitude vs Age"
+     )
+arrows(x,y-err,x,y+err, length=0.05,angle=90,code=3)
+grid(lty = "solid", lwd = 0.5)
+
+# line data
+A <- read.delim(paste0("final_line_width_age_tables/", c, "_line_width_age.txt"), header = FALSE)
+```
+
+#Perfrom non-weighted regression
+```{r regression}
+#non-weighted regression model
+model <- lm(y ~ poly(x, exponent, raw = TRUE))#specify x^n values to take polynomial 
+
+#x values to predict y at
+new <- data.frame(x = A[,12])
+
+#confidence interval no weights
+con_int <- predict(model, new, interval = "confidence", level = 0.95)
+
+con_int_99 <- predict(model, new, interval = "confidence", level = 0.99)
+
+#plot results
+plot(x, y, xlim = range(c(new)), ylim=range(c(min(con_int_99[,2]), max(con_int_99[,3]))),
+     pch=20, cex = 0.5, xlab="Age (Myr)", ylab="Latitude (degrees)",
+     main="Latitude vs Age"
+     )
+arrows(x,y-err,x,y+err, length=0.02,angle=90,code=3)
+lines(new[,1], con_int[,1], col = "blue")
+lines(new[,1], con_int[,2], lty = 2, col = "red")
+lines(new[,1], con_int[,3], lty = 2, col = "red")
+lines(new[,1], con_int_99[,2], lty = 2, col = "dark grey")
+lines(new[,1], con_int_99[,3], lty = 2, col = "dark grey")
+grid(lty = "solid", lwd = 0.5)
+legend("topleft", legend = c("Regression model", "95% confidence", "99% confidence"),
+       col = c("blue", "red", "dark grey"), lty = c(1, 2, 2), bg = "white")
+```
+#Perfrom non-weighted regression but add weights to "predict" function
+```{r regression eval=FALSE}
+#weights
+w <- 1/err^2
+w <- w/sum(w)
+
+#non-weighted regression model
+model <- lm(y ~ poly(x, 3, raw = TRUE))#specify x^n values to take polynomial 
+
+#x values to predict y at
+new <- data.frame(x = A[,12])
+
+#confidence interval no weights
+con_int2 <- predict(model, new, interval = "confidence", level = 0.95, weights = w)
+
+con_int_99 <- predict(model, new, interval = "confidence", level = 0.99, weights = w)
+
+#plot results
+plot(x, y, xlim = range(c(new)), ylim=range(c(min(con_int_99[,2]), max(con_int_99[,3]))),
+     pch=20, cex = 0.5, xlab="Age (Myr)", ylab="Latitude (degrees)",
+     main="Latitude vs Age"
+     )
+arrows(x,y-err,x,y+err, length=0.02,angle=90,code=3)
+lines(new[,1], con_int2[,1], col = "blue")
+lines(new[,1], con_int2[,2], lty = 2, col = "red")
+lines(new[,1], con_int2[,3], lty = 2, col = "red")
+lines(new[,1], con_int_99[,2], lty = 2, col = "dark grey")
+lines(new[,1], con_int_99[,3], lty = 2, col = "dark grey")
+grid(lty = "solid", lwd = 0.5)
+legend("topleft", legend = c("Regression model", "95% confidence", "99% confidence"),
+       col = c("blue", "red", "dark grey"), lty = c(1, 2, 2), bg = "white")
+
+test1 <- con_int[,1]-con_int2[,1]
+test2 <- con_int[,2]-con_int2[,2]
+
+plot(new[,1],test1)
+lines(new[,1],test2,col="blue")
+```
+
+# Export pdf Plot
+```{r export, eval = FALSE}
+pdf(file = paste0("P_lat/con_int_paleo_", c, ".pdf", width = 10, height = 6)#change chain tag for output file
+plot(x, y, xlim = range(c(new)), ylim=range(c(min(con_int_99[,2]), max(con_int_99[,3]))),
+     pch=20, cex = 0.3, xlab="Age (Myr)", ylab="Latitude (degrees)",
+     main="Foundation Paleolatitude Curve" #change chain name for plot title
+     )
+arrows(x,y-err,x,y+err, length=0.02,angle=90,code=3, lwd = 0.3)
+lines(new[,1], con_int[,1], col = "blue")
+lines(new[,1], con_int[,2], lty = 2, col = "red")
+lines(new[,1], con_int[,3], lty = 2, col = "red")
+lines(new[,1], con_int_99[,2], lty = 2, col = "dark grey")
+lines(new[,1], con_int_99[,3], lty = 2, col = "dark grey")
+grid(lty = "solid", lwd = 0.1)
+legend("topleft", legend = c("2 parameter non-weighted model", "95% confidence", "99% confidence"), #change parameter value for legend output
+       col = c("blue", "red", "dark grey"), lty = c(1, 2, 2), bg = "white")
+dev.off
+```
+
+
+# create data table
+```{r table, eval=FALSE}
+sig <- (con_int[,1] - con_int[,2])/1.96
+
+B <- cbind(A, con_int, sig)
+
+write.table(B, paste0("Final_tables_w_paleolat/Paleolatitude_fit_", c, ".txt"), quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+
+write.table(B, paste0("Final_tables_w_paleolat/Paleolatitude_fit_", c, "_col_names.txt"), quote = FALSE, sep = "\t", row.names = FALSE, col.names = c("#Lon", "Lat", "Distance(km)", "Azimuth", "Smooth_Z(m)", "Raw_Z(m)", "1_sigma_width(km)", "lon_R", "lat_R", "lon_L", "lat_L", "Age(Myr)", "Lower_bound_95(Myr)", "Upper_bound_95(Myr)", "1_sigma_along(km)", "Paleolatitude", "lwr_95", "upper_95", "1_sig"))
+```
+
+# Create plot with separate paleolat types
+```{r eval=FALSE}
+chain = "Hawaiian-Emperor"
+pole <- read.delim(paste0("P_lat/", c, "_plat_poles.txt"), header = FALSE)
+spin <- read.delim(paste0("P_lat/", c, "_plat_spin.txt"), header = FALSE)
+plat <- read.delim(paste0("P_lat/", c, "_dist_age_plat.txt"), header = FALSE)
+
+age_pole <- pole[,4]
+age_spin <- spin[,4]
+age_plat <- plat[,4]
+
+plat_pole <- pole[,5]
+plat_spin <- spin[,5]
+plat_plat <- plat[,5]
+
+err_pole <- pole[,6]
+err_spin <- spin[,6]
+low_plat <- (plat_plat - plat[,7])/1.96
+high_plat <- (plat[,8] - plat_plat)/1.96
+
+png(file = paste0("thesis_figs/paleo_lat_", c, ".png"), width = 1000, height = 600)
+plot(age_spin, plat_spin, xlim = rev(range(c(new))), ylim=range(c(min(con_int[,2]), max(con_int[,3]))),
+     pch=20, cex = 0.5, xlab="Age (Myr)", ylab="Latitude (degrees)",
+     main=paste(chain, "Paleolatitudes"), cex.main=2
+     )
+
+grid(lty = "solid", lwd = 0.5)
+
+polygon(c(new[,1],rev(new[,1])), c(con_int[,3],rev(con_int[,1])), col = "grey", border = NA)
+polygon(c(new[,1],rev(new[,1])), c(con_int[,2],rev(con_int[,1])), col = "grey", border = NA)
+
+points(age_pole,plat_pole, pch=4, cex = 0.75, col = "darkgreen")
+arrows(age_pole,plat_pole-err_pole,age_pole,plat_pole+err_pole, length=0.02,angle=90,code=3, col = "darkgreen")
+
+points(age_spin,plat_spin, pch=8, cex = 0.75, col = "blue")
+arrows(age_spin,plat_spin-err_spin,age_spin,plat_spin+err_spin, length=0.02,angle=90,code=3, col = "blue")
+
+points(age_plat,plat_plat, pch=20, cex = 0.75)
+arrows(age_plat,plat_plat-low_plat,age_plat,plat_plat+high_plat, length=0.02,angle=90,code=3)
+
+points(x[1], y[1], pch = 1, cex = 0.75, col = "purple")
+arrows(x[1],y[1]-err[1],x[1],y[1]+err[1], length=0.02,angle=90,code=3, col = "purple")
+
+lines(new[,1],con_int[,1], col = "black")#Hawaii
+#lines(new[1:930,1], con_int[1:930,1], col = "black", lty = 1)#Louisville
+#lines(new[930:1260,1], con_int[930:1260,1], col = "black")
+#lines(new[1261:3345,1], con_int[1261:3345,1], col = "black", lty = 2)#Rurutu
+#lines(new[3345:4493,1], con_int[3345:4493,1], col = "black")
+#lines(new[4493:5881,1], con_int[4493:5881,1], col = "black")#RU
+lines(new[,1], con_int[,2], lty = 1, col = "red")
+lines(new[,1], con_int[,3], lty = 1, col = "red")
+legend("topright", legend = c("Regression model", "95% confidence", "Magnetization", "Magnetic anomaly skewness", "Equatorial sediment", "Present hotspot"),col = c("black", "red", "black", "darkgreen", "blue", "purple"), pch = c(NA, NA, 20, 4, 8, 1), lty = c(1, 1, NA, NA, NA, NA), bg = "white", cex=1.5) #HI, LV
+#legend("topright", legend = c("Regression model", "95% confidence", "Magnetic anomaly skewness", "Equatorial sediment", "Present hotspot"),col = c("black", "red", "darkgreen", "blue", "purple"), pch = c(NA, NA, 4, 8, 1), lty = c(1, 1, NA, NA, NA), bg = "white")#RU
+#legend("topright", legend = c("Regression model", "95% confidence", "Equatorial sediment", "Present hotspot"),col = c("black", "red", "blue", "purple"), pch = c(NA, NA, 8, 1), lty = c(1, 1, NA, NA), bg = "white")#CB,KO,FD
+dev.off
+```
+
+# Create plot with separate paleolat types on the same scale
+```{r eval=TRUE}
+pole <- read.delim(paste0("P_lat/", c, "_plat_poles.txt"), header = FALSE)
+spin <- read.delim(paste0("P_lat/", c, "_plat_spin.txt"), header = FALSE)
+plat <- read.delim(paste0("P_lat/", c, "_dist_age_plat.txt"), header = FALSE)
+
+age_pole <- pole[,4]
+age_spin <- spin[,4]
+age_plat <- plat[,4]
+
+plat_pole <- pole[,5] - y[1]
+plat_spin <- spin[,5] - y[1]
+plat_plat <- plat[,5] - y[1]
+
+err_pole <- pole[,6]
+err_spin <- spin[,6]
+low_plat <- (plat_plat - (plat[,7] - y[1]))/1.96
+high_plat <- ((plat[,8] - y[1]) - plat_plat)/1.96
+
+con_int2 = con_int - y[1]
+
+png(file = paste0("defense_figs/paleo_lat_same_scale_", c, ".png"), width = 1000, height = 600)
+plot(age_spin, plat_spin, xlim = rev(range(c(0,85))), ylim=range(c(-5,27)),
+     pch=20, cex = 0.5, xlab="Age (Myr)", ylab="Change in latitude (degrees)",
+     main=c, cex.main=3, cex.lab=1.5
+     )
+
+grid(lty = "solid", lwd = 0.5)
+
+polygon(c(new[,1],rev(new[,1])), c(con_int2[,3],rev(con_int2[,1])), col = "grey", border = NA)
+polygon(c(new[,1],rev(new[,1])), c(con_int2[,2],rev(con_int2[,1])), col = "grey", border = NA)
+
+points(age_pole,plat_pole, pch=4, cex = 0.75, col = "darkgreen")
+arrows(age_pole,plat_pole-err_pole,age_pole,plat_pole+err_pole, length=0.02,angle=90,code=3, col = "darkgreen")
+
+points(age_spin,plat_spin, pch=8, cex = 0.75, col = "blue")
+arrows(age_spin,plat_spin-err_spin,age_spin,plat_spin+err_spin, length=0.02,angle=90,code=3, col = "blue")
+
+points(age_plat,plat_plat, pch=20, cex = 0.75)
+arrows(age_plat,plat_plat-low_plat,age_plat,plat_plat+high_plat, length=0.02,angle=90,code=3)
+
+points(x[1], 0, pch = 1, cex = 0.75, col = "purple")
+arrows(x[1],-err[1],x[1],err[1], length=0.02,angle=90,code=3, col = "purple")
+
+lines(new[,1],con_int2[,1], col = "black")#Hawaii, other chains
+#lines(new[1:930,1], con_int2[1:930,1], col = "black", lty = LV)#Louisville
+#lines(new[930:1260,1], con_int2[930:1260,1], col = "black")
+#lines(new[1261:3345,1], con_int2[1261:3345,1], col = "black", lty = RU)#Rurutu
+#lines(new[3345:4493,1], con_int2[3345:4493,1], col = "black")
+#lines(new[4493:5881,1], con_int2[4493:5881,1], col = "black")#RU
+lines(new[,1], con_int2[,2], lty = 1, col = "red")#HI, other chains
+lines(new[,1], con_int2[,3], lty = 1, col = "red")#HI, other chains
+#lines(new[1:930,1], con_int2[1:930,2], lty = LV, col = "red")#LV
+#lines(new[1:930,1], con_int2[1:930,3], lty = LV, col = "red")#LV
+#lines(new[930:1260,1], con_int2[930:1260,2], lty = 1, col = "red")
+#lines(new[930:1260,1], con_int2[930:1260,3], lty = 1, col = "red")
+#lines(new[1261:3345,1], con_int2[1261:3345,2], lty = RU, col = "red")#RU
+#lines(new[1261:3345,1], con_int2[1261:3345,3], lty = RU, col = "red")#RU
+#lines(new[3345:4493,1], con_int2[3345:4493,2], lty = 1, col = "red")
+#lines(new[3345:4493,1], con_int2[3345:4493,3], lty = 1, col = "red")
+#lines(new[4493:5881,1], con_int2[4493:5881,2], lty = 1, col = "red")#RU
+#lines(new[4493:5881,1], con_int2[4493:5881,3], lty = 1, col = "red")#RU
+
+#legend("topright", legend = c("Regression model", "95% confidence", "Magnetization", "Magnetic anomaly skewness", "Equatorial sediment", "Present hotspot"),col = c("black", "red", "black", "darkgreen", "blue", "purple"), pch = c(NA, NA, 20, 4, 8, 1), lty = c(1, 1, NA, NA, NA, NA), lwd = c(3, 3, NA, NA, NA, NA), bg = "white", cex = 2) #HI, LV
+#legend("topright", legend = c("Regression model", "95% confidence", "Magnetic anomaly skewness", "Equatorial sediment", "Present hotspot"),col = c("black", "red", "darkgreen", "blue", "purple"), pch = c(NA, NA, 4, 8, 1), lty = c(1, 1, NA, NA, NA), bg = "white")#RU
+#legend("topright", legend = c("Regression model", "95% confidence", "Equatorial sediment", "Present hotspot"),col = c("black", "red", "blue", "purple"), pch = c(NA, NA, 8, 1), lty = c(1, 1, NA, NA), bg = "white")#CB,KO,FD
+dev.off
+```
